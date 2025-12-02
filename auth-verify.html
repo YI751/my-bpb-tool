@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>認証中...</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <p>認証情報を処理しています...</p>
+    <script>
+        const supabaseUrl = 'https://zflsgqzuvcnahxmthjpk.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpmbHNncXp1dmNuYWh4bXRoanBrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MTE1NzMsImV4cCI6MjA2NzA4NzU3M30.P1dLtsIorP7PoKkL97UCJ3UmIm_OQFu0NPJNmCOZV1I';
+        
+        try {
+            const supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                if (session) {
+                    window.location.href = '/';
+                }
+            });
+        } catch (e) {
+            document.body.innerHTML = `<p style="color: red;">認証エラーが発生しました。</p>`;
+        }
+    </script>
+</body>
+</html>
