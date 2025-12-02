@@ -1,0 +1,1934 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ブランド・ピラミッド・ビルダー</title>
+    
+    <!-- CDN via Tailwind CSS, Lucide Icons, and Supabase -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #f3f4f6; /* gray-100 */
+        }
+        .gradient-text {
+            background: linear-gradient(to right, #4f46e5, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .nav-link {
+            transition: all 0.2s ease-in-out;
+            border-bottom: 3px solid transparent;
+            position: relative;
+        }
+        .nav-link:after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 3px;
+            background-color: #4f46e5;
+            transition: width 0.3s ease-in-out;
+        }
+        .nav-link.active {
+            color: #4f46e5;
+            font-weight: 600;
+        }
+        .nav-link.active:after {
+            width: 100%;
+        }
+        .loader {
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        .auth-loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* === 2-COLUMN LAYOUT STYLES === */
+        @media (max-width: 767px) {
+            #step1-container {
+                margin-bottom: 1.5rem;
+            }
+        }
+        
+        /* === STEP 1 - TAB UI === */
+        .tab-button {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 0.5rem;
+            border-bottom: 3px solid transparent;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #6b7280;
+            transition: all 0.2s ease-in-out;
+            white-space: nowrap;
+        }
+        .tab-button:hover {
+            color: #4b5563;
+        }
+        .tab-button.active {
+            color: #4f46e5;
+            border-color: #4f46e5;
+        }
+        .tab-button.active .lucide {
+            color: #4f46e5;
+        }
+        .tab-button .lucide {
+            color: #9ca3af;
+            transition: color 0.2s;
+        }
+        .tab-button:hover .lucide {
+            color: #4b5563;
+        }
+
+        /* === STEP 2 - ACCORDION & SVG NAV === */
+        #pyramid-svg-nav-container {
+            position: relative;
+            max-width: 24rem;
+            margin-left: auto;
+            margin-right: auto;
+            margin-bottom: 1.5rem;
+        }
+        .pyramid-svg path {
+            fill: #e5e7eb;
+            stroke: #9ca3af;
+            stroke-width: 1;
+            transition: all 0.3s ease-in-out;
+            cursor: pointer;
+        }
+        .pyramid-svg text {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            font-weight: 700;
+            fill: #4b5563;
+            pointer-events: none;
+        }
+        .pyramid-svg path.svg-highlight {
+            fill: #c7d2fe;
+            stroke: #4f46e5;
+            stroke-width: 2;
+        }
+        .pyramid-svg path.svg-completed {
+            fill: #4f46e5;
+            stroke: #3730a3;
+        }
+        .pyramid-svg path.svg-completed + text {
+            fill: white;
+        }
+
+        .pyramid-step {
+            background-color: white;
+            border-radius: 0.75rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;
+            border-left: 4px solid #d1d5db;
+        }
+        
+        .step-header.accordion-button {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background-color: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .step-header.accordion-button:hover {
+            background-color: #f3f4f6;
+        }
+        
+        .step-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: 700;
+        }
+        
+        .step-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.25rem;
+            height: 2.25rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            color: white;
+            flex-shrink: 0;
+        }
+        
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+        }
+        /* Open state for accordion content */
+        .accordion-content.open {
+            max-height: 2000px; /* Large enough to fit content */
+        }
+
+        .step-content {
+            padding: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .accordion-icon {
+            transition: transform 0.3s ease-in-out;
+            color: #6b7280;
+        }
+        .accordion-icon.open {
+            transform: rotate(180deg);
+        }
+
+        .step-header .generate-btn {
+            position: relative;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+        .step-header > * {
+            position: relative;
+            z-index: 5;
+        }
+        
+        .pyramid-step.completed {
+            border-left-color: #4f46e5;
+        }
+        .pyramid-step.completed .step-header {
+             background-color: #eef2ff;
+        }
+        .pyramid-step.completed .step-title {
+            color: #3730a3;
+        }
+
+        .pyramid-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 0.875rem;
+            color: #374151;
+            background-color: #f9fafb;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            transition: all 0.2s ease-in-out;
+            resize: vertical;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            min-height: 100px;
+        }
+        .pyramid-textarea:focus {
+            outline: none;
+            border-color: #4f46e5;
+            background-color: white;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        .two-col-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+        @media (min-width: 768px) {
+            .two-col-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .generate-btn {
+            background-color: #4f46e5;
+            color: white;
+            font-weight: 700;
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease-in-out;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .generate-btn:hover:not(:disabled) {
+            background-color: #4338ca;
+        }
+        .generate-btn:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        
+        /* Information Cards & Styling */
+        .info-section h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            margin-top: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .desc-card {
+            background-color: white;
+            padding: 1.25rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            margin-bottom: 1rem;
+        }
+        .desc-card.border-l-red { border-left: 4px solid #ef4444; }
+        .desc-card.border-l-blue { border-left: 4px solid #3b82f6; }
+        .desc-card.border-l-yellow { border-left: 4px solid #eab308; }
+        .desc-card.border-l-purple { border-left: 4px solid #a855f7; }
+        .desc-card.border-l-indigo { border-left: 4px solid #6366f1; }
+        .desc-card.border-l-gray { border-left: 4px solid #6b7280; }
+        
+        .desc-card h4 {
+             font-size: 1rem;
+             font-weight: 700;
+             margin-bottom: 0.5rem;
+             display: flex;
+             align-items: center;
+        }
+        .desc-card p {
+            font-size: 0.925rem;
+            line-height: 1.6;
+            color: #374151;
+        }
+        .desc-card strong {
+            color: #1f2937;
+            font-weight: 700;
+        }
+
+        .yellow-box {
+            background-color: #fffbeb; 
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-top: 0.75rem;
+            border: 1px solid #fcd34d; 
+        }
+        .yellow-box strong {
+            color: #d97706; 
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        .yellow-box p {
+            color: #92400e;
+            font-size: 0.875rem;
+        }
+
+        .step-outline {
+            border: 1px solid #6366f1;
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            background-color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .step-outline h4 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+        .step-outline h4 i {
+            color: #4f46e5;
+            margin-right: 0.5rem;
+        }
+        .step-outline ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .step-outline li {
+            margin-bottom: 1rem;
+            padding-left: 1rem;
+            border-left: 3px solid #e5e7eb;
+        }
+        .step-outline li strong {
+            display: block;
+            color: #4b5563;
+            font-size: 0.95rem;
+            margin-bottom: 0.25rem;
+        }
+        .step-outline li p {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        .step-outline .highlight-text {
+            color: #4f46e5;
+            font-weight: 700;
+        }
+
+         /* Sample Pyramid Styles - Matching User's Screenshot */
+         .sample-pyramid {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 10px -1px rgb(0 0 0 / 0.08);
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .sample-header {
+            padding: 1rem;
+            background-color: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        /* Layer specific styles for visual hierarchy */
+        .layer-row {
+            padding: 1rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .layer-row:last-child { border-bottom: none; }
+        
+        .layer-label {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.375rem;
+        }
+        .layer-m .layer-label { background-color: #f3f4f6; color: #4b5563; }
+        .layer-w .layer-label { background-color: #eff6ff; color: #3b82f6; } /* Blue for Who */
+        .layer-what .layer-label { background-color: #fefce8; color: #ca8a04; } /* Yellow for What */
+        .layer-h .layer-label { background-color: #faf5ff; color: #9333ea; } /* Purple for How */
+        .layer-b .layer-label { background-color: #fef2f2; color: #dc2626; } /* Red for Brand */
+
+        .layer-content {
+            font-size: 0.875rem;
+            line-height: 1.6;
+            color: #334155;
+            word-wrap: break-word; /* Prevent overflow */
+        }
+        
+        /* Sub-grid for Who and What sections */
+        .sub-grid-container {
+            display: grid;
+            gap: 0.75rem;
+        }
+        .sub-item {
+            background-color: #f8fafc;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            border: 1px solid #f1f5f9;
+        }
+        .sub-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #64748b;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        .sub-text {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #334155;
+        }
+
+        /* Auth UI Styles */
+        .auth-card, .content-panel { display: none; }
+        .auth-card { margin-left: auto; margin-right: auto; }
+    </style>
+</head>
+<body class="bg-slate-100 text-gray-800">
+
+    <!-- ===== AUTHENTICATION CONTAINER ===== -->
+    <div id="auth-container">
+        <!-- 1. ローディング画面 -->
+        <div id="loading-section" class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+                <div class="auth-loader mx-auto"></div>
+                <p class="mt-4 text-gray-600">状態を確認中...</p>
+                <p id="loading-timeout-msg" class="text-red-500 text-xs mt-2 hidden">応答がありません。まもなくログイン画面へ移動します...</p>
+            </div>
+        </div>
+
+        <!-- 2. ログイン/新規登録画面 -->
+        <div id="login-section" class="auth-card flex items-center justify-center min-h-screen p-4" style="display: none;">
+            <div class="max-w-md w-full bg-white p-8 rounded-2xl shadow-lg text-center">
+                <h2 id="auth-title" class="text-2xl font-bold text-gray-800">ブランド・ピラミッド・ビルダーへようこそ</h2>
+                <p id="auth-subtitle" class="text-gray-600 mt-2 mb-6">ツールを利用するにはログインまたは新規登録が必要です。</p>
+                <form id="login-form" class="space-y-4 text-left">
+                    <div><input type="email" id="email-input" placeholder="メールアドレス" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                    <div><input type="password" id="password-input" placeholder="パスワード (6文字以上)" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                    <button type="submit" id="auth-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-md">ログイン</button>
+                </form>
+                <div id="auth-error" class="hidden mt-4 text-sm text-red-600 bg-red-100 p-3 rounded-lg"></div>
+                <div id="auth-success" class="hidden mt-4 text-sm text-green-700 bg-green-100 p-3 rounded-lg"></div>
+                <p class="mt-6 text-sm text-gray-600">
+                    <span id="auth-prompt-text">アカウントをお持ちでないですか？</span>
+                    <a href="#" id="toggle-auth-mode" class="font-medium text-indigo-600 hover:text-indigo-500">新規登録</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== APPLICATION MAIN CONTAINER (Initially Hidden) ===== -->
+    <div id="app-container" class="hidden">
+        <div id="app" class="max-w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <header class="mb-8 text-center relative max-w-7xl mx-auto">
+                <h1 class="text-4xl font-extrabold text-gray-800 tracking-tight"><span class="gradient-text">ブランド・ピラミッド・ビルダー</span></h1>
+                <button id="logout-button" class="absolute top-0 right-0 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-md text-sm">
+                    ログアウト
+                </button>
+            </header>
+            
+            <div class="max-w-7xl mx-auto bg-white/80 backdrop-blur-sm rounded-xl shadow-md sticky top-4 z-10 mb-8">
+                <nav class="p-2">
+                    <ul class="flex flex-wrap justify-center gap-2">
+                        <li><a href="#tool" class="nav-link active flex items-center gap-2 px-4 py-2 text-sm sm:text-base font-medium text-gray-600 hover:text-indigo-600"><i data-lucide="wrench"></i>ツール本体</a></li>
+                        <li><a href="#about" class="nav-link flex items-center gap-2 px-4 py-2 text-sm sm:text-base font-medium text-gray-600 hover:text-indigo-600"><i data-lucide="book-open"></i>ツールの説明</a></li>
+                        <li><a href="#how-to-use" class="nav-link flex items-center gap-2 px-4 py-2 text-sm sm:text-base font-medium text-gray-600 hover:text-indigo-600"><i data-lucide="list-checks"></i>操作ステップ</a></li>
+                        <li><a href="#samples" class="nav-link flex items-center gap-2 px-4 py-2 text-sm sm:text-base font-medium text-gray-600 hover:text-indigo-600"><i data-lucide="notebook-text"></i>ピラミッドサンプル</a></li>
+                    </ul>
+                </nav>
+            </div>
+
+            <main class="max-w-7xl mx-auto">
+                <!-- Loading Overlay -->
+                <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-75 flex justify-center items-center z-50 hidden">
+                    <div class="text-center">
+                        <div class="loader mx-auto"></div>
+                        <p id="loading-text" class="mt-4 text-lg font-semibold text-gray-700">AIが戦略を構築中です...</p>
+                    </div>
+                </div>
+                <!-- Notifications -->
+                <div id="success-message" class="fixed bottom-4 right-4 p-4 rounded-lg shadow-xl z-[100] bg-green-600 text-white hidden fade-in">
+                    <p id="success-text"></p>
+                </div>
+                <div id="error-message" class="fixed bottom-4 right-4 p-4 rounded-lg shadow-xl z-[100] bg-red-600 text-white hidden fade-in">
+                    <p id="error-text"></p>
+                </div>
+
+                <!-- Tool Section -->
+                <section id="tool" class="page-content">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+            
+                        <!-- ===== Left Column (Step 1) ===== -->
+                        <div id="step1-container" class="md:col-span-1 md:sticky md:top-24 self-start">
+                            <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
+                                <h2 class="text-2xl font-bold mb-4 text-center flex items-center justify-center gap-2"><i data-lucide="edit-3" class="text-indigo-600"></i>Step 1: 基礎情報</h2>
+                                <p class="text-gray-500 text-sm text-center mb-6">ブランド戦略の土台となります。<br>（すべて任意入力）</p>
+
+                                <!-- Tab UI -->
+                                <div class="mb-4 border-b border-gray-200">
+                                    <nav class="-mb-px flex space-x-2 sm:space-x-4" aria-label="Tabs">
+                                        <button id="tab-btn-basic" class="tab-button active group">
+                                            <i data-lucide="file-text" class="h-5 w-5 mr-2"></i> 基本情報
+                                        </button>
+                                        <button id="tab-btn-advanced" class="tab-button group">
+                                            <i data-lucide="file-plus-2" class="h-5 w-5 mr-2"></i> 詳細情報
+                                        </button>
+                                    </nav>
+                                </div>
+
+                                <!-- Tab Content -->
+                                <div id="tab-content-basic" class="tab-content space-y-4">
+                                    <div>
+                                        <label for="industry" class="block text-sm font-medium text-gray-700">【任意】対象業界</label>
+                                        <input type="text" id="industry" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: パチンコホール業界">
+                                    </div>
+                                    <div>
+                                        <label for="product-name" class="block text-sm font-medium text-gray-700">【推奨】自社製品/サービスの内容</label>
+                                        <input type="text" id="product-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 駅前型パチンコホール「Victory」">
+                                    </div>
+                                    <div>
+                                        <label for="product-url" class="block text-sm font-medium text-gray-700">自社製品・企業URL</label>
+                                        <input type="url" id="product-url" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="https://www.example-pachinko.com">
+                                    </div>
+                                    <div>
+                                        <label for="business-problem" class="block text-sm font-medium text-gray-700"><span class="text-red-500 font-bold">【推奨】</span>ビジネス課題</label>
+                                        <textarea id="business-problem" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 若年層のパチンコ離れが進み、新規顧客の獲得が難しい。既存顧客の高齢化も課題。"></textarea>
+                                    </div>
+                                </div>
+                                <div id="tab-content-advanced" class="tab-content hidden space-y-4">
+                                    <div class="grid grid-cols-1 gap-4">
+                                        <div>
+                                            <label for="competitor-name" class="block text-sm font-medium text-gray-700">【任意】競合製品/サービス名</label>
+                                            <input type="text" id="competitor-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 近隣の競合パチンコホール、オンラインゲーム">
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-4">
+                                        <div>
+                                            <label for="competitor-url" class="block text-sm font-medium text-gray-700">【任意】競合のURL</label>
+                                            <input type="url" id="competitor-url" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="https://www.competitor.com">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label for="product-features" class="block text-sm font-medium text-gray-700">【任意】製品の主な特徴・機能・強み</label>
+                                        <textarea id="product-features" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 最新機種の導入スピード、駅チカの立地、快適な遊技環境"></textarea>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-4">
+                                        <div>
+                                            <label for="price-range" class="block text-sm font-medium text-gray-700">【任意】価格帯</label>
+                                            <input type="text" id="price-range" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 4円パチンコ、1円パチンコ">
+                                        </div>
+                                        <div>
+                                            <label for="marketing-goal" class="block text-sm font-medium text-gray-700">【任意】マーケティングの主なゴール</label>
+                                            <input type="text" id="marketing-goal" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 若年層の新規顧客獲得">
+                                        </div>
+                                    </div>
+                                     <div>
+                                        <label for="customer-pain" class="block text-sm font-medium text-gray-700">【任意】顧客の具体的な悩み（ペイン）</label>
+                                        <textarea id="customer-pain" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 「パチンコは古臭い」「タバコ臭い」「お金がかかりすぎる」"></textarea>
+                                    </div>
+                                    <div>
+                                        <label for="brand-assets" class="block text-sm font-medium text-gray-700">【任意】保有アセット・リソース</label>
+                                        <textarea id="brand-assets" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 地域密着の長年の運営実績、LINE会員5000人"></textarea>
+                                    </div>
+                                    <div>
+                                        <label for="brand-constraints" class="block text-sm font-medium text-gray-700">【任意】ブランドの制約条件・NGイメージ</label>
+                                        <textarea id="brand-constraints" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 射幸心を煽りすぎない、ギャンブル依存症対策への配慮"></textarea>
+                                    </div>
+                                    <div>
+                                        <label for="target-customer" class="block text-sm font-medium text-gray-700">【任意】ターゲット顧客（ヒント）</label>
+                                        <textarea id="target-customer" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 30代～50代の男性会社員、気分転換を求める層"></textarea>
+                                    </div>
+                                    <div>
+                                        <label for="tone-manner" class="block text-sm font-medium text-gray-700">【任意】トーン＆マナー（ヒント）</label>
+                                        <textarea id="tone-manner" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="例: 気軽さ、エンターテイメント性、高揚感"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ===== Right Column (Step 2) ===== -->
+                        <div id="step2-container" class="md:col-span-2">
+                            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-gray-200">
+                                <div class="text-center mb-6">
+                                    <h2 class="text-2xl font-bold mb-1 flex items-center justify-center gap-2"><i data-lucide="layers" class="text-indigo-600"></i>Step 2: ピラミッド構築</h2>
+                                    <p class="text-gray-500 text-sm">AIが戦略ピラミッドを階層ごとに生成します。</p>
+                                </div>
+                                
+                                <div class="flex flex-col sm:flex-row justify-center gap-4 mb-6">
+                                    <button id="download-pyramid" class="generate-btn bg-gray-600 hover:bg-gray-700">
+                                        <i data-lucide="download"></i>
+                                        CSVダウンロード
+                                    </button>
+                                    <button id="reset-pyramid" class="generate-btn bg-red-600 hover:bg-red-700">
+                                        <i data-lucide="rotate-ccw"></i>
+                                        リセット
+                                    </button>
+                                </div>
+
+                                <!-- SVG Navigation -->
+                                <div id="pyramid-svg-nav-container">
+                                    <svg id="pyramid-svg" class="pyramid-svg w-full" viewBox="0 0 200 250" xmlns="http://www.w3.org/2000/svg">
+                                        <!-- M: Market -->
+                                        <path id="svg-m" d="M 80 10 L 120 10 L 130 40 L 70 40 Z"></path>
+                                        <text x="100" y="30" text-anchor="middle" font-size="10">M</text>
+                                        <!-- W: Who -->
+                                        <path id="svg-w-who" d="M 70 42 L 130 42 L 140 72 L 60 72 Z"></path>
+                                        <text x="100" y="61" text-anchor="middle" font-size="10">W</text>
+                                        <!-- W: What -->
+                                        <path id="svg-w-what" d="M 60 74 L 140 74 L 150 104 L 50 104 Z"></path>
+                                        <text x="100" y="93" text-anchor="middle" font-size="10">W</text>
+                                        <!-- H: How -->
+                                        <path id="svg-h" d="M 50 106 L 150 106 L 160 136 L 40 136 Z"></path>
+                                        <text x="100" y="125" text-anchor="middle" font-size="10">H</text>
+                                        <!-- B: Brand Character -->
+                                        <path id="svg-b" d="M 40 138 L 160 138 L 170 168 L 30 168 Z"></path>
+                                        <text x="100" y="157" text-anchor="middle" font-size="10">B</text>
+                                    </svg>
+                                </div>
+                                
+                                <!-- Accordion Steps -->
+                                <div id="pyramid-container" class="pyramid-steps-container space-y-4">
+                                    
+                                    <!-- M: Market -->
+                                    <div class="pyramid-step" id="step-m">
+                                        <div id="accordion-btn-m" class="step-header accordion-button">
+                                            <h3 class="step-title">
+                                                <span class="step-label bg-gray-400">M</span>
+                                                Market
+                                            </h3>
+                                            <div class="flex items-center gap-4">
+                                                <button id="generate-m" class="generate-btn">
+                                                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                                                    生成
+                                                </button>
+                                                <i data-lucide="chevron-down" class="accordion-icon h-5 w-5"></i>
+                                            </div>
+                                        </div>
+                                        <div id="accordion-content-m" class="accordion-content">
+                                            <div class="step-content">
+                                                <label for="output-m" class="block text-sm font-medium text-gray-700 mb-1">攻略する市場・カテゴリー</label>
+                                                <textarea id="output-m" class="pyramid-textarea" rows="3" placeholder="AIによる「攻略する市場」の定義..."></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- W: Who -->
+                                    <div class="pyramid-step" id="step-w-who">
+                                        <div id="accordion-btn-w-who" class="step-header accordion-button">
+                                            <h3 class="step-title">
+                                                <span class="step-label bg-gray-400">W</span>
+                                                Who
+                                            </h3>
+                                            <div class="flex items-center gap-4">
+                                                <button id="generate-w-who" class="generate-btn">
+                                                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                                                    生成
+                                                </button>
+                                                <i data-lucide="chevron-down" class="accordion-icon h-5 w-5"></i>
+                                            </div>
+                                        </div>
+                                        <div id="accordion-content-w-who" class="accordion-content">
+                                            <div class="step-content">
+                                                <div class="two-col-grid">
+                                                    <div>
+                                                        <label for="output-w-st" class="block text-sm font-medium text-gray-700 mb-1">戦略ターゲット (ST)</label>
+                                                        <textarea id="output-w-st" class="pyramid-textarea" rows="4" placeholder="AIによる「戦略ターゲット」の定義..."></textarea>
+                                                    </div>
+                                                    <div>
+                                                        <label for="output-w-ct" class="block text-sm font-medium text-gray-700 mb-1">コアターゲット (CT)</label>
+                                                        <textarea id="output-w-ct" class="pyramid-textarea" rows="4" placeholder="AIによる「コアターゲット」のインサイト..."></textarea>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- W: What -->
+                                    <div class="pyramid-step" id="step-w-what">
+                                        <div id="accordion-btn-w-what" class="step-header accordion-button">
+                                            <h3 class="step-title">
+                                                <span class="step-label bg-gray-400">W</span>
+                                                What
+                                            </h3>
+                                            <div class="flex items-center gap-4">
+                                                <button id="generate-w-what" class="generate-btn">
+                                                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                                                    生成
+                                                </button>
+                                                <i data-lucide="chevron-down" class="accordion-icon h-5 w-5"></i>
+                                            </div>
+                                        </div>
+                                        <div id="accordion-content-w-what" class="accordion-content">
+                                            <div class="step-content">
+                                                <div class="two-col-grid">
+                                                    <div>
+                                                        <label for="output-w-benefit" class="block text-sm font-medium text-gray-700 mb-1">Benefit - 中核となる便益</label>
+                                                        <textarea id="output-w-benefit" class="pyramid-textarea" rows="4" placeholder="AIによる「Benefit」の定義..."></textarea>
+                                                    </div>
+                                                    <div>
+                                                        <label for="output-w-rtb" class="block text-sm font-medium text-gray-700 mb-1">RTB - 便益の信憑性</label>
+                                                        <textarea id="output-w-rtb" class="pyramid-textarea" rows="4" placeholder="AIによる「RTB」の定義..."></textarea>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- H: How -->
+                                    <div class="pyramid-step" id="step-h">
+                                        <div id="accordion-btn-h" class="step-header accordion-button">
+                                            <h3 class="step-title">
+                                                <span class="step-label bg-gray-400">H</span>
+                                                How
+                                            </h3>
+                                            <div class="flex items-center gap-4">
+                                                <button id="generate-h" class="generate-btn">
+                                                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                                                    生成
+                                                </button>
+                                                <i data-lucide="chevron-down" class="accordion-icon h-5 w-5"></i>
+                                            </div>
+                                        </div>
+                                        <div id="accordion-content-h" class="accordion-content">
+                                            <div class="step-content">
+                                                <label for="output-h" class="block text-sm font-medium text-gray-700 mb-1">How to provide Benefit - 便益の提供方法</label>
+                                                <textarea id="output-h" class="pyramid-textarea" rows="4" placeholder="AIによる「便益の提供方法」の提案..."></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- B: Brand Character -->
+                                    <div class="pyramid-step" id="step-b">
+                                        <div id="accordion-btn-b" class="step-header accordion-button">
+                                            <h3 class="step-title">
+                                                <span class="step-label bg-gray-400">B</span>
+                                                Brand Character
+                                            </h3>
+                                            <div class="flex items-center gap-4">
+                                                <button id="generate-b" class="generate-btn">
+                                                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                                                    生成
+                                                </button>
+                                                <i data-lucide="chevron-down" class="accordion-icon h-5 w-5"></i>
+                                            </div>
+                                        </div>
+                                        <div id="accordion-content-b" class="accordion-content">
+                                            <div class="step-content">
+                                                <label for="output-b" class="block text-sm font-medium text-gray-700 mb-1">ブランド人格・スローガン</label>
+                                                <textarea id="output-b" class="pyramid-textarea" rows="3" placeholder="AIによる「ブランド人格」の定義..."></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                 <!-- About Section -->
+                <section id="about" class="page-content hidden info-section">
+                     <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200">
+                        <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-6 border-b pb-4">「ブランド・ピラミッド・ビルダー」活用ガイド</h2>
+                        
+                        <div class="mb-8">
+                            <h3 class="text-xl font-bold text-gray-800 mb-4 border-none p-0">なぜ提案に「ブランド・エクイティ・ピラミッド」が必要なのか？</h3>
+                            <div class="desc-card border-l-red">
+                                <h4><i data-lucide="compass" class="h-5 w-5 mr-2 text-red-500"></i>「ただの広告枠」ではなく「解決策」を売るために</h4>
+                                <p class="mb-4">
+                                    お客様の多くは、「単なる広告枠」ではなく「課題を解決する提案や方法」を求めていると思います。
+                                    <br>しかし、いきなりWeb広告やSNS運用などの「手法（How）」から提案してしまうと、
+                                    <br>「なぜその施策なのか？」という根拠が弱くなり、価格競争に巻き込まれた経験が皆様にもおありではないでしょうか？
+                                </p>
+                                <p class="mb-4">
+                                    このツールを活用していただくことで、お客様のサービスやブランドに関するピラミッド作成を通して、
+                                    <br>各広告手法や施策（WEB広告、SNS運用、イベント、オフライン等）を一貫性のあるストーリで繋ぎ、
+                                    <strong class="text-indigo-600">「なぜこの提案がお客様に必要なのか」を説明する際の一助</strong>になればと考えました。
+                                </p>
+                                <div class="yellow-box">
+                                    <strong>結論：提案の「受注率」を上げる</strong>
+                                    <p>ブランド・エクイティ・ピラミッドの作成を通して、
+                                    <br>「誰の（Who）」「どんな本音（Insight）」を攻略するのかを定義し、施策を通して達成したい「プロモーションのゴール」を定めることで、
+                                    <br>お客様との目線合わせ、提案の納得感を得ることが可能だと考えます。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-8">
+                             <h3 class="text-xl font-bold text-gray-800 mb-4 border-none p-0">5つの階層：提案のロジックを組み立てる</h3>
+                             
+                             <div class="desc-card border-l-gray-500 border-l-4 mb-4">
+                                 <h4 class="text-gray-800"><i data-lucide="map" class="h-5 w-5 mr-2 text-gray-500"></i>M: Market (勝てる土俵選び)</h4>
+                                 <p>単に「〇〇業界」と広く捉えるのではなく、自社が勝てる「独自の土俵」を定義します。<br>
+                                 例：「ただの遊園地」ではなく「家族の絆を深める週末体験市場」と定義し直すことで、競合と差別化します。</p>
+                             </div>
+
+                             <div class="desc-card border-l-blue border-l-4 mb-4">
+                                 <h4 class="text-gray-800"><i data-lucide="users" class="h-5 w-5 mr-2 text-blue-500"></i>W: Who (狙うべき顧客)</h4>
+                                 <p class="mb-2">「誰に売るか」「どのような方にブランドやサービスを知ってもらって利用してほしいか」を定義します。
+                                 <br>数と質の両面からターゲット層を検討するための項目です。
+                                 </p>
+                                 <ul class="list-disc pl-5 text-sm space-y-1 text-gray-600">
+                                     <li><strong class="text-blue-600">戦略ターゲット (ST):</strong> ビジネスとして売上を確保できる「ボリュームゾーン」。</li>
+                                     <li><strong class="text-blue-600">コアターゲット (CT):</strong> ブランドやサービスの便益を確実に届けたい層。</li>
+                                 </ul>
+                             </div>
+
+                             <div class="desc-card border-l-yellow border-l-4 mb-4">
+                                 <h4 class="text-gray-800"><i data-lucide="gem" class="h-5 w-5 mr-2 text-yellow-500"></i>W: What (提供する価値)</h4>
+                                 <p class="mb-2">顧客の悩みに応える、ブランドやサービスの「売り」と「根拠」を定義します。</p>
+                                 <ul class="list-disc pl-5 text-sm space-y-1 text-gray-600">
+                                     <li><strong class="text-yellow-600">Benefit (便益):</strong> 商品を使った顧客が得られる「嬉しい体験・変化」。</li>
+                                     <li><strong class="text-yellow-600">RTB (根拠):</strong> 「本当に？」という疑いを晴らす、客観的な「証拠・スペック・実績」。</li>
+                                 </ul>
+                             </div>
+
+                             <div class="desc-card border-l-purple border-l-4 mb-4">
+                                 <h4 class="text-gray-800"><i data-lucide="settings" class="h-5 w-5 mr-2 text-purple-500"></i>H: How (具体的な戦術・施策)</h4>
+                                 <p>定義した価値をどう届けるか。各種WEB広告、SNSキャンペーン、チラシ、TVCM、店頭POP、駅看板など、
+                                    <br>私たちが普段提案する具体的な「施策」そのものの案を整理します。
+                                 </p>
+                             </div>
+
+                             <div class="desc-card border-l-red border-l-4 mb-4">
+                                 <h4 class="text-gray-800"><i data-lucide="heart" class="h-5 w-5 mr-2 text-red-500"></i>B: Brand Character (ブランドの人格)</h4>
+                                 <p>ブランドやサービスが、消費者にどう記憶されたいかを定め、プロモーション全体のトーン＆マナーを統一する為に定義する項目となります。</p>
+                             </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- How To Use Section (Updated to match image) -->
+                <section id="how-to-use" class="page-content hidden info-section">
+                     <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6 border-b pb-4">操作ステップと活用ガイド</h2>
+                        
+                        <!-- Reference Guide (Input helper) -->
+                         <div class="mb-12">
+                            <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center border-none p-0"><i data-lucide="lightbulb" class="h-6 w-6 mr-2 text-indigo-600"></i>活用ガイド：Step 1の入力補助</h3>
+                            <p class="text-gray-500 mb-6 text-sm">
+                            ボタンをクリックすると、「ツール本体」のStep 1入力欄に各業界のサンプルデータが自動入力されます。
+                            </p>
+                            <div id="reference-examples-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <!-- Injected by JS -->
+                            </div>
+                            <div id="how-to-use-load-message" class="mt-4 text-center text-green-600 font-semibold hidden bg-green-50 p-2 rounded"></div>
+                        </div>
+
+                        <h3 class="text-xl font-bold text-gray-900 mb-6 border-b pb-2">操作ステップ</h3>
+
+                        <div class="step-outline border-indigo-200">
+                            <h4><i data-lucide="edit-3"></i>Step 1: 基礎情報の入力 (提案の「勝率」を高める準備)</h4>
+                            <p class="mb-4 text-gray-700">
+                                ブランド・エクイティ・ピラミッドを作成して、提案内容を整理したり、受注率を高めるための「各情報」を入力するステップです。
+                                <br>全ての項目は任意入力で使用していただけます。入力内容が具体的であるほど、AIがお客様に刺さる戦略骨子を作成しやすくなります。
+                                <br>できるだけ項目は埋めていただいた方が良いですが、必要最低限入力していただく形でも問題ございません。
+                            </p>
+                            <p class="mb-4 text-gray-700">左カラムの <strong class="text-indigo-600">[基本情報]</strong> タブと <strong class="text-indigo-600">[詳細情報]</strong> タブを入力します。</p>
+                            
+                            <ul>
+                                <li>
+                                    <strong><span class="text-red-500">①【最重要】</span>ビジネス課題 ([基本情報]タブ)</strong>
+                                    <p class="text-sm text-gray-600 mt-1">クライアントが本当に解決したい「課題」を入力してください。<br>
+                                    例：「売上が悪い」ではなく「若年層の新規来店が減っている」と具体的に書くことで、その課題を解決する為の内容を生成してくれるようになります。</p>
+                                </li>
+                                <li class="mt-4">
+                                    <strong><span class="text-indigo-500">②【推奨】</span>ターゲットが抱える「隠れた悩み」 ([詳細情報]タブ)</strong>
+                                    <p class="text-sm text-gray-600 mt-1">ここを入力すると、AIが「ターゲットの本音・悩み」を深く分析します。<br>
+                                    「なんとなく不満」ではなく「〇〇が面倒くさい」「本当は△△したい」といった内容を推測・想像して入力することで、<br>「消費者のことをよくわかっている提案だ」と信頼を得やすくなります。</p>
+                                </li>
+                                <li class="mt-4">
+                                    <strong><span class="text-indigo-500">③【推奨】</span>提案先の「強み」や「特徴」 ([詳細情報]タブ)</strong>
+                                    <p class="text-sm text-gray-600 mt-1">ここを入力すると、AIが「なぜこの商品なら解決できるのか？」という「根拠」を生成します。
+                                    <br>URLや特徴を入れるだけで、ただのアイデア出しではなく、実現可能性の高い「勝てる提案」に近づきます。</p>
+                                </li>
+                            </ul>
+                            
+                            <div class="yellow-box mt-4">
+                                <strong>💡 受注率アップのコツ</strong>
+                                <p>AIは「具体的な内容」を入力することで、より効果を発揮します。「ターゲットの悩み（②）」や「自社の強み・特徴（③）」をセットで入力することで、AIは「その悩みを、この強みで解決する」というパターンを導き出します。</p>
+                            </div>
+                        </div>
+
+                        <div class="step-outline border-indigo-200">
+                            <h4><i data-lucide="layers"></i>Step 2: ピラミッドの構築 (戦略の「骨格」を最速で作成)</h4>
+                            <p class="mb-4 text-gray-700">Step 1の情報を元に、AIを使って提案内容の参考となるピラミッドを作り上げます。<br>ゼロから考える時間を短縮し、営業視点での「提案内容構築」に時間を活用することが可能です。</p>
+                            
+                            <ul>
+                                <li>
+                                    <strong>SVGまたはヘッダーで開閉:</strong>
+                                    <p>右カラムの図やヘッダーをクリックして、各階層のアコーディオンを開きます。複数の階層を同時に開いて、全体を見渡しながら作業することも可能です。</p>
+                                </li>
+                                <li>
+                                    <strong>アコーディオン内で「生成」:</strong>
+                                    <p>「生成」ボタンを押すと、AIが提案のたたき台を作成します。<br>通常はM（市場）から順に生成しますが、アイデアが欲しい箇所から自由に生成することもできます。</p>
+                                </li>
+                                <li>
+                                    <strong>「編集」して「再生成」</strong>
+                                    <p>AIの案をベースに、直接修正を加えることも可能。<br>
+                                    <strong>あなたが修正した内容は「決定事項」としてAIに認識され、次の階層の生成に反映されます。</strong> 自分の言葉で戦略をブラッシュアップすることも可能です。</p>
+                                </li>
+                                <li>
+                                    <strong>「リセット」と「CSVダウンロード」:</strong>
+                                    <p>完成したピラミッドは「CSVダウンロード」して、そのまま提案書（PowerPointなど）の構成案として利用できます。</p>
+                                </li>
+                            </ul>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- Samples Section -->
+                <section id="samples" class="page-content hidden info-section">
+                     <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6 border-b pb-4">ピラミッドサンプル (全6業種)</h2>
+                        <div id="sample-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- Injected by JS -->
+                        </div>
+                        <div id="sample-load-message" class="mt-6 text-center text-green-600 font-semibold hidden"></div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script>
+    // ===== SUPABASE & AUTHENTICATION CONFIG =====
+    const supabaseUrl = 'https://zflsgqzuvcnahxmthjpk.supabase.co';
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpmbHNncXp1dmNuYWh4bXRoanBrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MTE1NzMsImV4cCI6MjA2NzA4NzU3M30.P1dLtsIorP7PoKkL97UCJ3UmIm_OQFu0NPJNmCOZV1I';
+    let supabaseClient;
+
+    const appContainer = document.getElementById('app-container');
+    const authContainer = document.getElementById('auth-container');
+    const loadingSection = document.getElementById('loading-section');
+    const loadingTimeoutMsg = document.getElementById('loading-timeout-msg');
+    const loginSection = document.getElementById('login-section');
+    const logoutButton = document.getElementById('logout-button');
+    const loginForm = document.getElementById('login-form');
+    const emailInput = document.getElementById('email-input');
+    const passwordInput = document.getElementById('password-input');
+    const authTitle = document.getElementById('auth-title');
+    const authSubtitle = document.getElementById('auth-subtitle');
+    const authButton = document.getElementById('auth-button');
+    const authPromptText = document.getElementById('auth-prompt-text');
+    const toggleAuthModeLink = document.getElementById('toggle-auth-mode');
+    const authError = document.getElementById('auth-error');
+    const authSuccess = document.getElementById('auth-success');
+
+    let isSignUpMode = false;
+    let toolInitialized = false;
+
+    // --- Auth Logic ---
+    const updateAuthUI = (state) => {
+        console.log(`[Auth] UI state: ${state}`);
+        // Reset/Hide all main sections
+        loadingSection.style.display = 'none';
+        loginSection.style.display = 'none';
+        authContainer.style.display = 'none';
+        appContainer.style.display = 'none';
+
+        switch (state) {
+            case 'LOADING':
+                authContainer.style.display = 'block';
+                loadingSection.style.display = 'flex';
+                break;
+            case 'LOGIN':
+                authContainer.style.display = 'block';
+                loginSection.style.display = 'flex';
+                break;
+            case 'APP':
+                appContainer.style.display = 'block';
+                if (!toolInitialized) {
+                    initializeAppLogic(); 
+                    toolInitialized = true;
+                }
+                break;
+        }
+    };
+
+    try {
+        // Force fallback if Supabase hangs
+        const loadingTimeout = setTimeout(() => {
+            if (document.getElementById('loading-section').style.display !== 'none') {
+                console.warn("Supabase init timeout. Forcing Login screen.");
+                if(loadingTimeoutMsg) loadingTimeoutMsg.classList.remove('hidden');
+                setTimeout(() => {
+                    updateAuthUI('LOGIN');
+                }, 1500);
+            }
+        }, 3000); // 3 seconds timeout
+
+        supabaseClient = supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            clearTimeout(loadingTimeout);
+            if (session) {
+                updateAuthUI('APP');
+            } else {
+                updateAuthUI('LOGIN');
+            }
+        });
+
+        // Check initial session
+        supabaseClient.auth.getSession().then(({ data: { session } }) => {
+            clearTimeout(loadingTimeout);
+            if (session) {
+                updateAuthUI('APP');
+            } else {
+                updateAuthUI('LOGIN');
+            }
+        }).catch(err => {
+            console.error("Session check failed:", err);
+            clearTimeout(loadingTimeout);
+            updateAuthUI('LOGIN');
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            authError.style.display = 'none';
+            authSuccess.style.display = 'none';
+            authButton.disabled = true;
+            authButton.textContent = isSignUpMode ? '登録中...' : 'ログイン中...';
+
+            const email = emailInput.value;
+            const password = passwordInput.value;
+
+            try {
+                if (isSignUpMode) {
+                    const { error } = await supabaseClient.auth.signUp({ 
+                        email, 
+                        password,
+                        options: { emailRedirectTo: `${window.location.origin}/auth-verify.html` }
+                    });
+                    if (error) throw error;
+                    authSuccess.textContent = '確認メールを送信しました。メール内のリンクをクリックして完了してください。';
+                    authSuccess.style.display = 'block';
+                } else {
+                    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                    if (error) throw error;
+                }
+            } catch (error) {
+                authError.textContent = `エラー: ${error.message}`;
+                authError.style.display = 'block';
+            } finally {
+                authButton.disabled = false;
+                authButton.textContent = isSignUpMode ? '新規登録' : 'ログイン';
+            }
+        });
+
+        toggleAuthModeLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            isSignUpMode = !isSignUpMode;
+            loginForm.reset();
+            authError.style.display = 'none';
+            authSuccess.style.display = 'none';
+            authTitle.textContent = isSignUpMode ? '新規登録' : 'ブランド・ピラミッド・ビルダーへようこそ';
+            authButton.textContent = isSignUpMode ? '新規登録' : 'ログイン';
+            authPromptText.textContent = isSignUpMode ? 'すでにアカウントをお持ちですか？' : 'アカウントをお持ちでないですか？';
+            toggleAuthModeLink.textContent = isSignUpMode ? 'ログイン' : '新規登録';
+        });
+
+        logoutButton.addEventListener('click', async () => {
+            await supabaseClient.auth.signOut();
+            window.location.reload();
+        });
+
+    } catch (e) {
+        console.error("Supabase init error:", e);
+        // Force show login on error
+        updateAuthUI('LOGIN');
+        authError.textContent = "Supabaseの設定エラーまたは接続エラー";
+        authError.style.display = 'block';
+    }
+
+
+    // ===== CORE APP LOGIC =====
+    function initializeAppLogic() {
+        lucide.createIcons();
+        
+        // --- State Management ---
+        const getInitialPyramidState = () => ({
+            market: "",
+            who: { st: "", ct: "" },
+            what: { benefit: "", rtb: "" },
+            how: "",
+            brandCharacter: ""
+        });
+        
+        let pyramidState = getInitialPyramidState();
+
+        // --- Navigation ---
+        const navLinks = document.querySelectorAll('.nav-link');
+        const pages = document.querySelectorAll('.page-content');
+        const switchPage = (hash) => {
+            pages.forEach(page => page.classList.add('hidden'));
+            navLinks.forEach(link => link.classList.remove('active'));
+            const targetHash = hash || '#tool';
+            const activePage = document.querySelector(targetHash);
+            const activeLink = document.querySelector(`a[href="${targetHash}"]`);
+            if (activePage && activeLink) {
+                activePage.classList.remove('hidden');
+                activePage.classList.add('fade-in');
+                activeLink.classList.add('active');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                document.querySelector('#tool').classList.remove('hidden');
+                document.querySelector('a[href="#tool"]').classList.add('active');
+            }
+        };
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetLink = e.target.closest('a');
+                if (targetLink) {
+                    const hash = targetLink.hash;
+                    if (window.location.hash !== hash) { window.location.hash = hash; } 
+                    else { switchPage(hash); }
+                }
+            });
+        });
+        window.addEventListener('hashchange', () => switchPage(window.location.hash));
+        switchPage(window.location.hash);
+
+        // --- DOM Elements ---
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        const successMessage = document.getElementById('success-message');
+        const successText = document.getElementById('success-text');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+
+        // Step 1 Inputs
+        const industryInput = document.getElementById('industry');
+        const productNameInput = document.getElementById('product-name');
+        const competitorNameInput = document.getElementById('competitor-name');
+        const businessProblemInput = document.getElementById('business-problem');
+        const productUrlInput = document.getElementById('product-url');
+        const competitorUrlInput = document.getElementById('competitor-url');
+        const productFeaturesInput = document.getElementById('product-features');
+        const priceRangeInput = document.getElementById('price-range');
+        const marketingGoalInput = document.getElementById('marketing-goal');
+        const customerPainInput = document.getElementById('customer-pain');
+        const brandAssetsInput = document.getElementById('brand-assets');
+        const brandConstraintsInput = document.getElementById('brand-constraints');
+        const targetCustomerInput = document.getElementById('target-customer');
+        const toneMannerInput = document.getElementById('tone-manner');
+
+        const tabButtons = {
+            basic: document.getElementById('tab-btn-basic'),
+            advanced: document.getElementById('tab-btn-advanced')
+        };
+        const tabContents = {
+            basic: document.getElementById('tab-content-basic'),
+            advanced: document.getElementById('tab-content-advanced')
+        };
+        
+        // Step 2 Elements
+        const downloadPyramidBtn = document.getElementById('download-pyramid');
+        const resetPyramidBtn = document.getElementById('reset-pyramid');
+        
+        const svgPaths = {
+            m: document.getElementById('svg-m'),
+            wWho: document.getElementById('svg-w-who'),
+            wWhat: document.getElementById('svg-w-what'),
+            h: document.getElementById('svg-h'),
+            b: document.getElementById('svg-b')
+        };
+        
+        const accordionButtons = {
+            m: document.getElementById('accordion-btn-m'),
+            wWho: document.getElementById('accordion-btn-w-who'),
+            wWhat: document.getElementById('accordion-btn-w-what'),
+            h: document.getElementById('accordion-btn-h'),
+            b: document.getElementById('accordion-btn-b')
+        };
+        const accordionContents = {
+            m: document.getElementById('accordion-content-m'),
+            wWho: document.getElementById('accordion-content-w-who'),
+            wWhat: document.getElementById('accordion-content-w-what'),
+            h: document.getElementById('accordion-content-h'),
+            b: document.getElementById('accordion-content-b')
+        };
+        const accordionIcons = {
+             m: document.querySelector('#accordion-btn-m .accordion-icon'),
+             wWho: document.querySelector('#accordion-btn-w-who .accordion-icon'),
+             wWhat: document.querySelector('#accordion-btn-w-what .accordion-icon'),
+             h: document.querySelector('#accordion-btn-h .accordion-icon'),
+             b: document.querySelector('#accordion-btn-b .accordion-icon')
+        };
+
+        const steps = {
+            m: {
+                stepEl: document.getElementById('step-m'),
+                btn: document.getElementById('generate-m'),
+                output: document.getElementById('output-m'),
+                label: document.querySelector('#step-m .step-label'),
+                svg: svgPaths.m,
+                next: 'wWho'
+            },
+            wWho: {
+                stepEl: document.getElementById('step-w-who'),
+                btn: document.getElementById('generate-w-who'),
+                outputST: document.getElementById('output-w-st'),
+                outputCT: document.getElementById('output-w-ct'),
+                label: document.querySelector('#step-w-who .step-label'),
+                svg: svgPaths.wWho,
+                next: 'wWhat'
+            },
+            wWhat: {
+                stepEl: document.getElementById('step-w-what'),
+                btn: document.getElementById('generate-w-what'),
+                outputBenefit: document.getElementById('output-w-benefit'),
+                outputRTB: document.getElementById('output-w-rtb'),
+                label: document.querySelector('#step-w-what .step-label'),
+                svg: svgPaths.wWhat,
+                next: 'h'
+            },
+            h: {
+                stepEl: document.getElementById('step-h'),
+                btn: document.getElementById('generate-h'),
+                output: document.getElementById('output-h'),
+                label: document.querySelector('#step-h .step-label'),
+                svg: svgPaths.h,
+                next: 'b'
+            },
+            b: {
+                stepEl: document.getElementById('step-b'),
+                btn: document.getElementById('generate-b'),
+                output: document.getElementById('output-b'),
+                label: document.querySelector('#step-b .step-label'),
+                svg: svgPaths.b,
+                next: null
+            }
+        };
+        
+        function switchTab(targetTab) { 
+            Object.values(tabButtons).forEach(btn => btn.classList.remove('active'));
+            Object.values(tabContents).forEach(content => content.classList.add('hidden'));
+            if (tabButtons[targetTab] && tabContents[targetTab]) {
+                tabButtons[targetTab].classList.add('active');
+                tabContents[targetTab].classList.remove('hidden');
+            }
+        }
+        tabButtons.basic.addEventListener('click', () => switchTab('basic'));
+        tabButtons.advanced.addEventListener('click', () => switchTab('advanced'));
+
+        const showLoader = (message) => {
+            loadingText.textContent = message;
+            loadingOverlay.classList.remove('hidden');
+        }
+        const hideLoader = () => loadingOverlay.classList.add('hidden');
+        
+        const showMessage = (text, isError = false) => {
+            if (isError) {
+                errorText.textContent = text;
+                errorMessage.classList.remove('hidden');
+                setTimeout(() => errorMessage.classList.add('hidden'), 5000);
+            } else {
+                successText.textContent = text;
+                successMessage.classList.remove('hidden');
+                setTimeout(() => successMessage.classList.add('hidden'), 3000);
+            }
+        };
+
+        // --- Supabase Edge Function Call ---
+        async function callGeminiAPI(prompt, jsonSchema = null, stepKey = "") {
+            showLoader(`Step: ${stepKey} を生成中...`);
+            
+            // Invoke the Edge Function 'call-gemini-bpv'
+            const payload = {
+                prompt: prompt,
+                jsonSchema: jsonSchema
+            };
+
+            try {
+                const { data, error } = await supabaseClient.functions.invoke('call-gemini-bpv', {
+                    body: payload
+                });
+
+                if (error) throw error;
+                if (data.error) throw new Error(data.error);
+
+                // Check for block or finish reason if returned in specific format
+                if (data.candidates && data.candidates[0].finishReason !== "STOP") {
+                     throw new Error(`Generation stopped: ${data.candidates[0].finishReason}`);
+                }
+
+                // Parse the response
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    let cleanedText = text;
+                    if (jsonSchema) {
+                        cleanedText = cleanedText.replace(/^```json\n?/, '').replace(/```$/, '');
+                    }
+                    return cleanedText;
+                } else {
+                    throw new Error("Invalid response from API.");
+                }
+            } catch (e) {
+                console.error(`Edge Function Error (${stepKey}):`, e);
+                showMessage(`エラーが発生しました: ${e.message}`, true);
+                return null;
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // --- Logic & Updates ---
+        function updateStepUI(stepKey, isLoading = false) {
+            const step = steps[stepKey];
+            if (!step) return;
+            step.btn.disabled = isLoading;
+            if (isLoading) {
+                step.btn.innerHTML = `<span class="loader !w-4 !h-4 !border-2"></span> 生成中...`;
+            } else {
+                 step.btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> 生成`;
+                 lucide.createIcons();
+            }
+        }
+        function completeStep(stepKey, nextStepKey) {
+            const step = steps[stepKey];
+            step.stepEl.classList.add('completed');
+            step.label.classList.remove('bg-gray-400');
+            step.label.classList.add('bg-indigo-600');
+            step.btn.innerHTML = `<i data-lucide="refresh-cw" class="w-4 h-4"></i> 再生成`;
+            step.svg.classList.add('svg-completed');
+            lucide.createIcons();
+            toggleAccordion(stepKey, true);
+        }
+        function resetAllSteps() {
+            pyramidState = getInitialPyramidState();
+            Object.values(steps).forEach((step) => {
+                step.stepEl.classList.remove('completed');
+                step.label.classList.add('bg-gray-400');
+                step.label.classList.remove('bg-indigo-600');
+                step.btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> 生成`;
+                step.btn.disabled = false;
+                step.svg.classList.remove('svg-completed');
+                step.svg.classList.remove('svg-highlight');
+                if(step.output) step.output.value = "";
+                if(step.outputST) step.outputST.value = "";
+                if(step.outputCT) step.outputCT.value = "";
+                if(step.outputBenefit) step.outputBenefit.value = "";
+                if(step.outputRTB) step.outputRTB.value = "";
+            });
+            lucide.createIcons();
+            showMessage('ピラミッドをリセットしました。', false);
+            toggleAccordion('m', true);
+        }
+        
+        function toggleAccordion(stepKey, forceOpen = null) {
+            if (!accordionContents[stepKey] || !accordionIcons[stepKey] || !steps[stepKey]) return;
+            const content = accordionContents[stepKey];
+            const icon = accordionIcons[stepKey];
+            const svg = steps[stepKey].svg;
+            const isOpen = content.classList.contains('open');
+            let shouldOpen = false;
+
+            if (forceOpen === true) shouldOpen = true;
+            else if (forceOpen === false) shouldOpen = false;
+            else shouldOpen = !isOpen;
+
+            if (shouldOpen) {
+                content.style.maxHeight = "2000px"; 
+                content.classList.add('open');
+                icon.classList.add('open');
+                svg.classList.add('svg-highlight');
+            } else {
+                content.style.maxHeight = null;
+                content.classList.remove('open');
+                icon.classList.remove('open');
+                svg.classList.remove('svg-highlight');
+            }
+        }
+        
+        function getBaseInputs() {
+            return {
+                industry: industryInput.value.trim() || '指定なし',
+                productName: productNameInput.value.trim() || '指定なし',
+                competitorName: competitorNameInput.value.trim() || '指定なし',
+                businessProblem: businessProblemInput.value.trim() || '指定なし',
+                productUrl: productUrlInput.value.trim() || '指定なし',
+                competitorUrl: competitorUrlInput.value.trim() || '指定なし',
+                productFeatures: productFeaturesInput.value.trim() || '指定なし',
+                priceRange: priceRangeInput.value.trim() || '指定なし',
+                marketingGoal: marketingGoalInput.value.trim() || '指定なし',
+                customerPain: customerPainInput.value.trim() || '指定なし',
+                brandAssets: brandAssetsInput.value.trim() || '指定なし',
+                brandConstraints: brandConstraintsInput.value.trim() || '指定なし',
+                targetCustomer: targetCustomerInput.value.trim() || '指定なし',
+                toneManner: toneMannerInput.value.trim() || '指定なし'
+            };
+        }
+        function getInputSummary() {
+            const inputs = getBaseInputs();
+            return `
+# 基礎情報
+- 対象業界: ${inputs.industry}
+- 自社製品/サービスの内容: ${inputs.productName}
+- 自社製品・企業URL: ${inputs.productUrl}
+- ビジネス課題: ${inputs.businessProblem}
+# 詳細情報
+- 競合製品/サービス名: ${inputs.competitorName}
+- 競合URL: ${inputs.competitorUrl}
+- 製品の主な特徴: ${inputs.productFeatures}
+- 価格帯: ${inputs.priceRange}
+- マーケティングゴール: ${inputs.marketingGoal}
+- 顧客の不満 (ペイン): ${inputs.customerPain}
+- 保有アセット・リソース: ${inputs.brandAssets}
+- ブランドの制約条件: ${inputs.brandConstraints}
+- 顧客ヒント: ${inputs.targetCustomer}
+- トーンヒント: ${inputs.toneManner}
+`;
+        }
+
+        // --- Generators ---
+        async function generateMarket() {
+            updateStepUI('m', true);
+            const prompt = `${getInputSummary()}
+# 指示
+上記「基礎情報」および「詳細情報」に基づき、このブランドが攻略すべき「Market（市場・カテゴリー）」を定義してください。
+単なる製品カテゴリー（例：遊園地）ではなく、顧客が認識する「ベネフィットベースの価値市場」（例：特別な家族の週末体験市場）として定義してください。`;
+            const schema = {
+                type: "OBJECT",
+                properties: { market: { type: "STRING", description: "ベネフィットベースで定義された市場・カテゴリー" } },
+                required: ["market"]
+            };
+            const resultText = await callGeminiAPI(prompt, schema, 'M');
+            updateStepUI('m', false);
+            if (resultText) {
+                try {
+                    const resultJson = JSON.parse(resultText);
+                    pyramidState.market = resultJson.market;
+                    steps.m.output.value = resultJson.market;
+                    completeStep('m', steps.m.next);
+                } catch (e) { showMessage("データ解析エラー (M)。", true); }
+            }
+        }
+
+        async function generateWho() {
+            updateStepUI('wWho', true);
+            const marketContext = pyramidState.market ? `- M (Market): ${pyramidState.market}` : "- M (Market): (未定)";
+            const prompt = `${getInputSummary()}
+# 前ステップの生成結果
+${marketContext}
+# 指示
+上記情報に基づき、「Who（ターゲット）」を定義してください。
+1. **strategyTarget (ST)**: 市場で最もボリュームが大きく勝てる層（デモグラフィック中心）。
+2. **coreTarget (CT)**: ブランドの価値に共鳴する層（サイコグラフィック・インサイト中心）。`;
+            const schema = {
+                type: "OBJECT",
+                properties: {
+                    strategyTarget: { type: "STRING", description: "戦略ターゲット(ST)" },
+                    coreTarget: { type: "STRING", description: "コアターゲット(CT)" }
+                },
+                required: ["strategyTarget", "coreTarget"]
+            };
+            const resultText = await callGeminiAPI(prompt, schema, 'W-Who');
+            updateStepUI('wWho', false);
+            if (resultText) {
+                try {
+                    const resultJson = JSON.parse(resultText);
+                    pyramidState.who = { st: resultJson.strategyTarget, ct: resultJson.coreTarget };
+                    steps.wWho.outputST.value = resultJson.strategyTarget;
+                    steps.wWho.outputCT.value = resultJson.coreTarget;
+                    completeStep('wWho', steps.wWho.next);
+                } catch (e) { showMessage("データ解析エラー (W-Who)。", true); }
+            }
+        }
+
+        async function generateWhat() {
+            updateStepUI('wWhat', true);
+            const marketContext = pyramidState.market ? `- M (Market): ${pyramidState.market}` : "- M (Market): (未定)";
+            const whoContext = `- W (Who):\n    - ST: ${pyramidState.who.st}\n    - CT: ${pyramidState.who.ct}`;
+            const prompt = `${getInputSummary()}
+# 前ステップの生成結果
+${marketContext}
+${whoContext}
+# 指示
+上記情報に基づき、「What（価値）」を定義してください。
+1. **benefit**: CTのインサイトに刺さる中核的な便益。
+2. **rtb**: そのBenefitを信じるに足る客観的な理由（製品特徴など）。`;
+            const schema = {
+                type: "OBJECT",
+                properties: {
+                    benefit: { type: "STRING", description: "中核となる便益（Benefit）" },
+                    rtb: { type: "STRING", description: "信じるに足る理由（Reason to Believe）" }
+                },
+                required: ["benefit", "rtb"]
+            };
+            const resultText = await callGeminiAPI(prompt, schema, 'W-What');
+            updateStepUI('wWhat', false);
+            if (resultText) {
+                try {
+                    const resultJson = JSON.parse(resultText);
+                    pyramidState.what = { benefit: resultJson.benefit, rtb: resultJson.rtb };
+                    steps.wWhat.outputBenefit.value = resultJson.benefit;
+                    steps.wWhat.outputRTB.value = resultJson.rtb;
+                    completeStep('wWhat', steps.wWhat.next);
+                } catch (e) { showMessage("データ解析エラー (W-What)。", true); }
+            }
+        }
+
+        async function generateHow() {
+            updateStepUI('h', true);
+            const marketContext = pyramidState.market ? `- M (Market): ${pyramidState.market}` : "- M (Market): (未定)";
+            const whoContext = `- W (Who):\n    - ST: ${pyramidState.who.st}\n    - CT: ${pyramidState.who.ct}`;
+            const whatContext = `- W (What):\n    - Benefit: ${pyramidState.what.benefit}\n    - RTB: ${pyramidState.what.rtb}`;
+            const prompt = `${getInputSummary()}
+# 前ステップの生成結果
+${marketContext}
+${whoContext}
+${whatContext}
+# 指示
+定義した「What（価値）」を顧客に届けるための具体的な「How（便益の提供方法）」を3〜5個、箇条書きで提案してください。`;
+            const schema = {
+                type: "OBJECT",
+                properties: { how: { type: "STRING", description: "便益の提供方法（How）。箇条書き。" } },
+                required: ["how"]
+            };
+            const resultText = await callGeminiAPI(prompt, schema, 'H');
+            updateStepUI('h', false);
+            if (resultText) {
+                try {
+                    const resultJson = JSON.parse(resultText);
+                    pyramidState.how = resultJson.how;
+                    steps.h.output.value = resultJson.how;
+                    completeStep('h', steps.h.next);
+                } catch (e) { showMessage("データ解析エラー (H)。", true); }
+            }
+        }
+
+        async function generateBrandCharacter() {
+            updateStepUI('b', true);
+            const marketContext = pyramidState.market ? `- M (Market): ${pyramidState.market}` : "- M (Market): (未定)";
+            const whoContext = `- W (Who):\n    - ST: ${pyramidState.who.st}\n    - CT: ${pyramidState.who.ct}`;
+            const whatContext = `- W (What):\n    - Benefit: ${pyramidState.what.benefit}\n    - RTB: ${pyramidState.what.rtb}`;
+            const howContext = `- H (How): ${pyramidState.how}`;
+            const prompt = `${getInputSummary()}
+# 前ステップの生成結果
+${marketContext}
+${whoContext}
+${whatContext}
+${howContext}
+# 指示
+ピラミッド全体を体現する「Brand Character（ブランド人格）」と「スローガン」を定義してください。`;
+            const schema = {
+                type: "OBJECT",
+                properties: { brandCharacter: { type: "STRING", description: "ブランド人格とスローガン" } },
+                required: ["brandCharacter"]
+            };
+            const resultText = await callGeminiAPI(prompt, schema, 'B');
+            updateStepUI('b', false);
+            if (resultText) {
+                try {
+                    const resultJson = JSON.parse(resultText);
+                    pyramidState.brandCharacter = resultJson.brandCharacter;
+                    steps.b.output.value = resultJson.brandCharacter;
+                    completeStep('b', steps.b.next);
+                } catch (e) { showMessage("データ解析エラー (B)。", true); }
+            }
+        }
+
+        // Event Listeners
+        steps.m.btn.addEventListener('click', (e) => { e.stopPropagation(); generateMarket(); });
+        steps.wWho.btn.addEventListener('click', (e) => { e.stopPropagation(); generateWho(); });
+        steps.wWhat.btn.addEventListener('click', (e) => { e.stopPropagation(); generateWhat(); });
+        steps.h.btn.addEventListener('click', (e) => { e.stopPropagation(); generateHow(); });
+        steps.b.btn.addEventListener('click', (e) => { e.stopPropagation(); generateBrandCharacter(); });
+        resetPyramidBtn.addEventListener('click', resetAllSteps);
+        
+        steps.m.output.addEventListener('input', (e) => pyramidState.market = e.target.value);
+        steps.wWho.outputST.addEventListener('input', (e) => pyramidState.who.st = e.target.value);
+        steps.wWho.outputCT.addEventListener('input', (e) => pyramidState.who.ct = e.target.value);
+        steps.wWhat.outputBenefit.addEventListener('input', (e) => pyramidState.what.benefit = e.target.value);
+        steps.wWhat.outputRTB.addEventListener('input', (e) => pyramidState.what.rtb = e.target.value);
+        steps.h.output.addEventListener('input', (e) => pyramidState.how = e.target.value);
+        steps.b.output.addEventListener('input', (e) => pyramidState.brandCharacter = e.target.value);
+
+        Object.keys(accordionButtons).forEach(key => {
+            if (accordionButtons[key]) {
+                accordionButtons[key].addEventListener('click', (e) => {
+                    if (!e.target.closest('.generate-btn')) {
+                        toggleAccordion(key);
+                    }
+                });
+            }
+        });
+        
+        Object.keys(svgPaths).forEach(svgKey => {
+            let stepKey = svgKey; 
+            if (svgKey === 'wWho') stepKey = 'wWho';
+            if (svgKey === 'wWhat') stepKey = 'wWhat';
+            if (steps[stepKey] && steps[stepKey].svg) {
+                steps[stepKey].svg.addEventListener('click', () => {
+                    toggleAccordion(stepKey);
+                    if (accordionButtons[stepKey]) accordionButtons[stepKey].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                });
+            }
+        });
+
+        downloadPyramidBtn.addEventListener('click', () => {
+            const headers = ['階層', '項目', '生成内容'];
+            const data = [
+                ['M: Market', '市場・カテゴリー', pyramidState.market],
+                ['W: Who', '戦略ターゲット(ST)', pyramidState.who.st],
+                ['W: Who', 'コアターゲット(CT)', pyramidState.who.ct],
+                ['W: What', 'Benefit', pyramidState.what.benefit],
+                ['W: What', 'RTB', pyramidState.what.rtb],
+                ['H: How', '便益の提供方法', pyramidState.how],
+                ['B: Brand Character', 'ブランド人格', pyramidState.brandCharacter]
+            ];
+            const BOM = '\uFEFF';
+            let csvContent = BOM + headers.join(',') + '\r\n';
+            data.forEach(rowArray => {
+                const row = rowArray.map(item => `"${(item || '').replace(/"/g, '""').replace(/\n/g, '\r\n')}"`).join(',');
+                csvContent += row + '\r\n';
+            });
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", 'Brand_Pyramid_Output.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Sample Data Injection (COMPLETE 6 Industries)
+        const pyramidSamples = {
+            pachinko: {
+                title: "パチンコホール業界",
+                icon: "gamepad-2",
+                inputs: {
+                    industry: "パチンコホール業界", productName: "駅前型パチンコホール「Victory」", competitorName: "近隣の競合パチンコホール、オンラインゲーム", businessProblem: "若年層のパチンコ離れが進み、新規顧客の獲得が難しい。既存顧客の高齢化も課題。",
+                    productUrl: "", competitorUrl: "", productFeatures: "最新機種の導入スピード、駅チカの立地、快適な遊技環境",
+                    priceRange: "4円パチンコ、1円パチンコ", marketingGoal: "若年層の新規顧客獲得", customerPain: "「パチンコは古臭い」「タバコ臭い」「お金がかかりすぎる」",
+                    brandAssets: "地域密着の長年の運営実績、LINE会員5000人", brandConstraints: "射幸心を煽りすぎない、ギャンブル依存症対策への配慮",
+                    targetCustomer: "30代～50代の男性会社員、気分転換を求める層", toneManner: "気軽さ、エンターテイメント性、高揚感"
+                },
+                pyramid: {
+                    m: "短時間・高揚感エンターテイメント市場",
+                    w_st: "駅近のサラリーマン（30-50代男性）、可処分所得は中程度",
+                    w_ct: "仕事のストレスやプレッシャーから一時的に解放されたい、役割（上司、部下、父）を忘れて「無心」になりたい人",
+                    w_benefit: "日常の役割から解放され、頭を空っぽにできる、予測不能な1時間の興奮",
+                    w_rtb: "駅チカの立地、最新機種の導入スピード、短時間遊技コーナー",
+                    h: "・「1時間集中解放ゾーン」の設置\n・仕事帰りのビジネスマン向け「お疲れ様セット」\n・LINEでの新台情報即時配信",
+                    b: "あなたの日常に刺激を注入する、身近なエンタメ・パートナー"
+                }
+            },
+            fitness: {
+                title: "フィットネス業界",
+                icon: "dumbbell",
+                inputs: {
+                    industry: "フィットネス業界", productName: "AIパーソナルジム『FitMind』", competitorName: "従来の24時間ジム、オンラインフィットネス", businessProblem: "入会しても継続できず、数ヶ月で幽霊会員化する顧客が多い。結果LTVが上がらない。",
+                    productUrl: "https://www.fitmind-ai.com", competitorUrl: "", productFeatures: "AIによるリアルタイムのフォーム指導、30分で最大効果の独自プログラム、アプリでの進捗完全可視化",
+                    priceRange: "中価格帯（月額15,000円）", marketingGoal: "LTVの向上、継続率の改善", customerPain: "「ジムに通ってもどうせ続かない」「高い料金を払ってパーソナルトレーニングを受けるほどではない」「自己流で効果が出ない」",
+                    brandAssets: "既存会員3000名のアプリデータ、都内5拠点の小規模スタジオ", brandConstraints: "「根性」「気合」といった非科学的な訴求はNG。必ず「AI」による科学的根拠を軸にする。",
+                    targetCustomer: "30代後半、健康診断の結果を気にし始めた男女", toneManner: "科学的、効率的、パーソナル"
+                },
+                pyramid: {
+                    m: "タイムパフォーマンス重視の自己投資市場",
+                    w_st: "30-40代のビジネスパーソン。健康意識は高いが、多忙で時間を確保できない層。",
+                    w_ct: "「運動は根性」という古い常識に縛られ、効率的な努力の方法を知らない人。",
+                    w_benefit: "あなたの努力を「根性」で終わらせない、科学的根拠に基づく最短での成果",
+                    w_rtb: "AIが常時最適負荷を提案、30分で従来の90分相当の運動効果を実現するデータ",
+                    h: "・初回体験での「最適負荷」実感\n・「努力の可視化」アプリ連携\n・ビジネス誌タイアップ",
+                    b: "あなたの努力を最大化する、インテリジェントな相棒"
+                }
+            },
+             juku: { 
+                title: "学習塾業界", 
+                icon: "graduation-cap",
+                inputs: { 
+                    industry: "学習塾業界", productName: "中学生向け・思考プロセス診断付き個別指導塾", competitorName: "大手集団塾、他の個別指導塾、オンライン教材", businessProblem: "生徒数は多いが、成績が伸び悩む生徒の退塾率が高い。保護者の満足度向上。",
+                    productUrl: "", competitorUrl: "", productFeatures: "AIによる「思考のクセ」診断、診断結果に基づくオーダーメイドカリキュラム、現役難関大学生によるオンライン伴走",
+                    priceRange: "高価格帯（月額4万円～）", marketingGoal: "中上位層の生徒獲得、退塾率の低下", customerPain: "「勉強しているのに成績が上がらない」「子供のつまずきポイントが分からない」「集団塾ではついていけない」",
+                    brandAssets: "独自のAI診断エンジン、難関大学生の講師ネットワーク", brandConstraints: "「楽して成績が上がる」ではない。「根本原因の解決」を訴求。",
+                    targetCustomer: "中学生とその保護者、子供の学習方法に悩んでいる層", toneManner: "専門的、寄り添う、根本解決、ロジカル" 
+                },
+                pyramid: {
+                    m: "中学生向け・根本学力向上市場",
+                    w_st: "中学生とその保護者。子供の成績が中位〜中上位で伸び悩んでいる層。",
+                    w_ct: "子供は真面目に勉強しているのに結果が出ず、「うちの子は地頭が悪いのでは」と不安になっている保護者。",
+                    w_benefit: "お子様の成績が伸びない「本当の理由（思考のクセ）」を発見し、根本から解決する。",
+                    w_rtb: "AIによる「思考プロセス診断」（特許出願中）、診断結果に基づくオーダーメイドカリキュラム",
+                    h: "・「無料思考診断」の実施\n・診断レポートに基づく保護者面談の徹底\n・オンラインでの進捗共有",
+                    b: "お子様の可能性を信じる、論理的な学習ドクター"
+                }
+            },
+            kaitori: { 
+                title: "買取業界", 
+                icon: "recycle",
+                inputs: { 
+                    industry: "買取関係業界", productName: "ブランド品出張買取サービス「Next Value」", competitorName: "大手買取チェーン店、フリマアプリ", businessProblem: "フリマアプリの普及で、店舗買取の利用者が減少傾向。出張買取の認知度も低い。",
+                    productUrl: "https://www.next-value-kaitori.com", competitorUrl: "https://www.mercari.com", productFeatures: "手数料・送料無料の出張買取、専門鑑定士による丁寧な査定、その場で現金化",
+                    priceRange: "なし（買取）", marketingGoal: "出張買取の利用促進、フリマアプリとの差別化", customerPain: "「フリマアプリは写真撮影や梱包、購入者とのやり取りが面倒」「店舗に持ち込むのは恥ずかしい、重い」「たいした額にならないだろう」",
+                    brandAssets: "LINE公式アカウント（友達1万人）、ベテラン鑑定士5名在籍", brandConstraints: "「何でも買い取ります」といった安易な訴求はNG。「価値の分かる人へ」という専門性を重視する。",
+                    targetCustomer: "40代～60代女性、自宅整理や生前整理に関心がある層", toneManner: "信頼感、丁寧さ、共感" 
+                },
+                pyramid: {
+                    m: "クローゼット資産の価値転換市場",
+                    w_st: "40-60代の女性。使っていないブランド品をクローゼットに眠らせている層。",
+                    w_ct: "「売るのが面倒」「たいした額にならない」と思い込み、行動を先延ばしにしている人。",
+                    w_benefit: "クローゼットに眠る「負の資産」を、未来の新しい体験（旅行や食事）に変える、最も手軽な手段",
+                    w_rtb: "LINEで写真を送るだけの「クローゼット資産診断」、手数料・送料無料の出張買取",
+                    h: "・「クローゼットは銀行じゃない」啓発コミュニケーション\n・LINE査定の徹底的な簡略化\n・買取成立額に応じた旅行券プレゼント",
+                    b: "あなたの資産価値を再発見する、親切な資産コンサルタント"
+                }
+            },
+            realestate: { 
+                title: "不動産業界", 
+                icon: "home",
+                inputs: { 
+                    industry: "不動産業界（賃貸）", productName: "家具家電付き・住み替え可能「サブスク住居」", competitorName: "従来の賃貸マンション、シェアハウス", businessProblem: "初期費用（敷金礼金）がネックで引っ越しをためらう層が多い。空室期間の長期化。",
+                    productUrl: "", competitorUrl: "", productFeatures: "敷金礼金0、家具家電付き、同ブランド間の住み替え自由、オンライン契約完結",
+                    priceRange: "月額10万円～", marketingGoal: "Z世代・ミレニアル世代の新規契約者獲得", customerPain: "「引っ越しのたびに高額な初期費用がかかる」「家具を揃えるのが面倒」「転勤やライフスタイルの変化に対応しづらい」",
+                    brandAssets: "都内20棟の自社物件", brandConstraints: "「格安」ではなく「スマート」「合理的」というイメージを訴求",
+                    targetCustomer: "20代後半～30代前半、独身・DINKS、転勤やライフプラン変更の可能性がある層", toneManner: "自由、身軽さ、スマート、合理的" 
+                },
+                pyramid: {
+                    m: "Z世代・ミレニアル世代向け 合理的住居選択市場",
+                    w_st: "20代後半～30代前半、独身・DINKS。転勤やライフプラン変更の可能性がある層。",
+                    w_ct: "「所有」にこだわらず、初期費用や手間を最小限にして「身軽さ」と「合理性」を重視する人。",
+                    w_benefit: "引っ越しの「面倒」と「高額な初期費用」から解放され、いつでも最適な場所に住める自由",
+                    w_rtb: "敷金礼金0、家具家電付き、オンライン契約完結、同ブランド間の住み替え自由",
+                    h: "・SNSでの「ミニマリストな暮らし」発信\n・「初期費用0円」を強調したデジタル広告\n・住み替え体験者のインタビュー記事",
+                    b: "あなたの「今」に最適化する、スマートな暮らしのパートナー"
+                }
+            },
+            cardealer: { 
+                title: "カーディーラー業界", 
+                icon: "car",
+                inputs: { 
+                    industry: "自動車販売業界（カーディーラー）", productName: "地域密着型カーディーラー「ファミリーオート」", competitorName: "大手全国チェーンのカーディーラー、オンライン中古車販売サイト", businessProblem: "オンライン販売の台頭で、来店客数が減少。価格競争に巻き込まれ、利益率が低下している。",
+                    productUrl: "", competitorUrl: "", productFeatures: "充実したアフターサービス（車検、修理）、キッズスペース完備、地域での長年の信頼",
+                    priceRange: "中〜高価格帯（新車・中古車）", marketingGoal: "オンラインにはない「店舗ならではの価値」を訴求し、来店を促進する。",
+                    customerPain: "「ネットで買った方が安いのでは」「買った後のメンテナンスが不安」「ディーラーは敷居が高い、しつこく営業されそう」",
+                    brandAssets: "既存顧客リスト（車検案内用）、地域の祭りへの協賛実績", brandConstraints: "「激安」訴求はNG。信頼と安心感を重視。",
+                    targetCustomer: "店舗周辺に住む、小さな子供を持つ30代〜40代のファミリー層", toneManner: "安心感、信頼できる、親しみやすい、地域密着"
+                },
+                pyramid: {
+                    m: "家族の安全と快適なカーライフを支える地域パートナー市場",
+                    w_st: "店舗周辺に住む、小さな子供を持つ30代〜40代のファミリー層。",
+                    w_ct: "オンライン購入の「安さ」と、購入後の「メンテナンス不安」の間で揺れ動いている、車の知識に自信がない親。",
+                    w_benefit: "「売って終わり」ではない。家族の安全を、購入後もずっと見守り続ける地域のかかりつけ医のような安心感。",
+                    w_rtb: "キッズスペース完備の店舗、国家資格を持つ整備士による徹底したアフターフォロー、地域での長年の信頼。",
+                    h: "・「パパ・ママ安心 車検教室」の開催\n・購入者限定の「24時間トラブルLINEサポート」\n・キッズスペースでの定期的な子供向けイベント開催",
+                    b: "家族のカーライフに寄り添う、頼れる街の整備士"
+                }
+            }
+        };
+
+        const sampleContainer = document.getElementById('sample-container');
+        if (sampleContainer) {
+            Object.entries(pyramidSamples).forEach(([key, value]) => {
+                const card = document.createElement('div');
+                card.className = 'sample-pyramid';
+                
+                // Redesigned Card Structure to match Screenshot (image_990e91.png)
+                card.innerHTML = `
+                    <div class="sample-header">
+                        <h4 class="font-bold text-gray-800 text-lg flex items-center">
+                            <i data-lucide="${value.icon}" class="h-5 w-5 mr-2 text-indigo-600"></i>
+                            ${value.title}
+                        </h4>
+                    </div>
+                    
+                    <div class="flex-grow">
+                        <!-- M Layer -->
+                        <div class="layer-row layer-m">
+                            <span class="layer-label">M: Market</span>
+                            <p class="layer-content font-bold">${value.pyramid.m}</p>
+                        </div>
+                        
+                        <!-- W Layer (Who) -->
+                        <div class="layer-row layer-w">
+                            <span class="layer-label">W: Who</span>
+                            <div class="sub-grid-container">
+                                <div class="sub-item">
+                                    <span class="sub-label">ST (戦略ターゲット)</span>
+                                    <p class="sub-text">${value.pyramid.w_st}</p>
+                                </div>
+                                <div class="sub-item">
+                                    <span class="sub-label">CT (コアターゲット)</span>
+                                    <p class="sub-text font-medium text-blue-900">${value.pyramid.w_ct}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- W Layer (What) -->
+                        <div class="layer-row layer-what">
+                            <span class="layer-label">W: What</span>
+                            <div class="sub-grid-container">
+                                <div class="sub-item">
+                                    <span class="sub-label">Benefit (便益)</span>
+                                    <p class="sub-text font-bold text-yellow-900">${value.pyramid.w_benefit}</p>
+                                </div>
+                                <div class="sub-item">
+                                    <span class="sub-label">RTB (根拠)</span>
+                                    <p class="sub-text">${value.pyramid.w_rtb}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- H Layer -->
+                        <div class="layer-row layer-h">
+                            <span class="layer-label">H: How</span>
+                            <div class="layer-content pl-2 border-l-2 border-purple-200">
+                                ${value.pyramid.h.replace(/\n/g, '<br>')}
+                            </div>
+                        </div>
+                        
+                        <!-- B Layer -->
+                        <div class="layer-row layer-b bg-red-50/50">
+                            <span class="layer-label">B: Brand Character</span>
+                            <p class="layer-content font-bold text-red-800 text-center py-1">"${value.pyramid.b}"</p>
+                        </div>
+                    </div>
+                `;
+                sampleContainer.appendChild(card);
+            });
+        }
+        
+        const referenceExamplesContainer = document.getElementById('reference-examples-container');
+        if (referenceExamplesContainer) {
+            Object.entries(pyramidSamples).forEach(([key, value]) => {
+                const card = document.createElement('div');
+                card.className = "bg-white p-4 rounded-lg shadow-md border border-gray-200 transition-transform duration-200 hover:-translate-y-1";
+                card.innerHTML = `
+                    <h4 class="font-bold text-gray-800 text-lg mb-2 flex items-center">
+                        <i data-lucide="${value.icon}" class="h-5 w-5 mr-2 text-indigo-600"></i>
+                        ${value.title}
+                    </h4>
+                    <button data-key="${key}" class="step1-reference-button w-full mt-3 bg-green-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-600 flex items-center justify-center text-sm shadow transition-colors">
+                        <i data-lucide="send" class="h-4 w-4 mr-2"></i> この事例で試す
+                    </button>
+                `;
+                referenceExamplesContainer.appendChild(card);
+            });
+            referenceExamplesContainer.addEventListener('click', (e) => {
+                const button = e.target.closest('.step1-reference-button');
+                if (button) {
+                    const key = button.dataset.key;
+                    const example = pyramidSamples[key];
+                    if(!example) return;
+
+                    industryInput.value = example.inputs.industry || '';
+                    productNameInput.value = example.inputs.productName || '';
+                    competitorNameInput.value = example.inputs.competitorName || '';
+                    businessProblemInput.value = example.inputs.businessProblem || '';
+                    switchTab('advanced');
+                    productUrlInput.value = example.inputs.productUrl || '';
+                    competitorUrlInput.value = example.inputs.competitorUrl || '';
+                    productFeaturesInput.value = example.inputs.productFeatures || '';
+                    priceRangeInput.value = example.inputs.priceRange || '';
+                    marketingGoalInput.value = example.inputs.marketingGoal || '';
+                    customerPainInput.value = example.inputs.customerPain || '';
+                    targetCustomerInput.value = example.inputs.targetCustomer || '';
+                    toneMannerInput.value = example.inputs.toneManner || '';
+                    brandAssetsInput.value = example.inputs.brandAssets || '';
+                    brandConstraintsInput.value = example.inputs.brandConstraints || '';
+
+                    const loadMsg = document.getElementById('how-to-use-load-message');
+                    loadMsg.textContent = `「${example.title}」のStep 1データを入力しました。「ツール本体」タブに移動し、Step 2の「生成」ボタンを押してください。`;
+                    loadMsg.classList.remove('hidden');
+                    setTimeout(() => loadMsg.classList.add('hidden'), 5000);
+                    
+                    window.location.hash = '#tool';
+                    document.getElementById('tool').scrollIntoView({ behavior: 'smooth' });
+                    toggleAccordion('m', true); // Optionally open first one, but others can be opened freely
+                }
+            });
+        }
+
+        toggleAccordion('m', true); // Initial open
+    }
+    </script>
+</body>
+</html>
